@@ -5,6 +5,21 @@ MAX_SEARCH_RESULTS: 4 # Set the maximum search results for internet access DONT 
 ALLOW_DM: true # Set to true to allow direct messages
 SMART_MENTION: true # Set to true to enable smart mention feature
 
+INACTIVITY_AUTO_MESSAGE_ENABLED: true # Set true to post auto-message when general chat is inactive
+INACTIVITY_AUTO_MESSAGE_CHANNEL_ID: 1391792802911752197 # Preferred channel target by ID
+INACTIVITY_AUTO_MESSAGE_CHANNEL_NAME: general # Channel name to monitor for inactivity
+INACTIVITY_AUTO_MESSAGE_MIN_SECONDS: 300 # 5 minutes
+INACTIVITY_AUTO_MESSAGE_MAX_SECONDS: 300 # 5 minutes
+INACTIVITY_AUTO_MESSAGE_SEQUENCE_SECONDS: [300, 10800, 21600, 43200] # 5m, 3h, 6h, 12h after last real-user message
+INACTIVITY_AUTO_MESSAGE_POLL_SECONDS: 5 # Background check interval
+INACTIVITY_AUTO_MESSAGE_TEXT: "kaha harayau mero mayalu haru mero lagi ni time nikalana" # Message sent after inactivity
+INACTIVITY_DAILY_MESSAGE_ENABLED: false # Send a separate daily inactivity message
+INACTIVITY_DAILY_MESSAGE_TEXT: "Aight, every nigga here is busy with their girlfriend, no time for nobody else........Who tf is free for me when y’all out here acting like married men already?" # Daily one-time inactivity message text
+INACTIVITY_DAILY_MESSAGE_HOUR: 19 # 7 PM in configured timezone
+INACTIVITY_DAILY_MESSAGE_MINUTE: 0
+INACTIVITY_DAILY_UTC_OFFSET_MINUTES: 345 # Nepal Time UTC+5:45
+INACTIVITY_DAILY_REQUIRED_SILENCE_SECONDS: 900 # Only send if users have been silent for 15 min
+
 MODEL_ID: llama-3.1-8b-instant # Faster model for quicker chat responses
 
 MAX_HISTORY: 8 # Set the maximum message history
@@ -17,8 +32,8 @@ LANGUAGE: en # Specify the language code (check 'lang' folder for valid codes)
 DEFAULT_INSTRUCTION: assist # Specify the instruction prompt to use (check 'instructions' folder for valid prompts)
 # To add custom prompts, create a .txt file like 'custom.txt' in `instructions` folder and set INSTRUCTIONS as 'custom'
 
-Discord: https://discord.gg/6MT3CZauT8
-Github: https://github.com/mishalhossin/Discord-AI-Chatbot
+Discord: https://discord.gg/ymyWAv3RFA
+Github: Mitesh XDDDDD
 
 TRIGGER:
   - chatbot
@@ -32,9 +47,9 @@ AUTO_SHARDING: true
 
 DISABLE_PRESENCE: false 
 PRESENCES:
-  - How can I assist you?
+  - MEE TESH XDD
   - Currently in {guild_count} guilds
-  - Support at https://discord.gg/6MT3CZauT8
+  - Support at https://www.miteshmandal.me/
 # List of different presences to be used
 
 

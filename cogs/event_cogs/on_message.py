@@ -1,6 +1,8 @@
 import discord
 import asyncio
 import re
+import time
+from datetime import datetime, timedelta, timezone
 from discord.ext import commands
 from collections import deque
 
@@ -29,6 +31,117 @@ class OnMessage(commands.Cog):
         self._processed_message_ids = deque(maxlen=400)
         self._processed_message_set = set()
         self._response_locks = {}
+        self._inactivity_enabled = config.get('INACTIVITY_AUTO_MESSAGE_ENABLED', False)
+        configured_channel_id = config.get('INACTIVITY_AUTO_MESSAGE_CHANNEL_ID')
+        self._inactivity_channel_id = int(configured_channel_id) if configured_channel_id is not None else None
+        self._inactivity_channel_name = str(config.get('INACTIVITY_AUTO_MESSAGE_CHANNEL_NAME', 'general')).strip().lower()
+        self._inactivity_message = str(
+            config.get(
+                'INACTIVITY_AUTO_MESSAGE_TEXT',
+                "It's a little too quiet in here. Someone say something interesting.",
+            )
+        )
+        min_wait = int(config.get('INACTIVITY_AUTO_MESSAGE_MIN_SECONDS', 300))
+        max_wait = int(config.get('INACTIVITY_AUTO_MESSAGE_MAX_SECONDS', 360))
+        self._inactivity_min_seconds = max(1, min_wait)
+        self._inactivity_max_seconds = max(self._inactivity_min_seconds, max_wait)
+        sequence_cfg = config.get('INACTIVITY_AUTO_MESSAGE_SEQUENCE_SECONDS')
+        if isinstance(sequence_cfg, list):
+            parsed_sequence = []
+            for item in sequence_cfg:
+                try:
+                    seconds = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if seconds > 0:
+                    parsed_sequence.append(seconds)
+            self._inactivity_sequence_seconds = parsed_sequence
+        else:
+            self._inactivity_sequence_seconds = []
+        if not self._inactivity_sequence_seconds:
+            self._inactivity_sequence_seconds = [self._inactivity_min_seconds]
+        self._inactivity_poll_interval = max(5, int(config.get('INACTIVITY_AUTO_MESSAGE_POLL_SECONDS', 15)))
+        self._daily_enabled = bool(config.get('INACTIVITY_DAILY_MESSAGE_ENABLED', False))
+        self._daily_message = str(config.get('INACTIVITY_DAILY_MESSAGE_TEXT', 'where are you guys'))
+        self._daily_hour = max(0, min(23, int(config.get('INACTIVITY_DAILY_MESSAGE_HOUR', 19))))
+        self._daily_minute = max(0, min(59, int(config.get('INACTIVITY_DAILY_MESSAGE_MINUTE', 0))))
+        self._daily_required_silence = max(1, int(config.get('INACTIVITY_DAILY_REQUIRED_SILENCE_SECONDS', 900)))
+        self._daily_utc_offset_minutes = int(config.get('INACTIVITY_DAILY_UTC_OFFSET_MINUTES', 345))
+        self._inactivity_states = {}
+        self._inactivity_task = None
+
+    async def cog_load(self):
+        if self._inactivity_enabled and self._inactivity_task is None:
+            self._inactivity_task = asyncio.create_task(self._inactivity_worker())
+
+    async def cog_unload(self):
+        if self._inactivity_task is not None:
+            self._inactivity_task.cancel()
+            self._inactivity_task = None
+
+    def _reset_inactivity_for_channel(self, channel_id: int):
+        now = time.monotonic()
+        self._inactivity_states[channel_id] = {
+            "started_at": now,
+            "next_sequence_index": 0,
+            "next_send_at": now + self._inactivity_sequence_seconds[0],
+        }
+
+    def _resolve_target_channels(self):
+        if self._inactivity_channel_id is not None:
+            channel = self.bot.get_channel(self._inactivity_channel_id)
+            return [channel] if isinstance(channel, discord.TextChannel) else []
+
+        channels = []
+        for guild in self.bot.guilds:
+            channel = discord.utils.get(guild.text_channels, name=self._inactivity_channel_name)
+            if channel is not None:
+                channels.append(channel)
+        return channels
+
+    async def _inactivity_worker(self):
+        await self.bot.wait_until_ready()
+
+        while not self.bot.is_closed():
+            now = time.monotonic()
+            for channel in self._resolve_target_channels():
+                if channel is None:
+                    continue
+
+                me = channel.guild.me
+                if me is None or not channel.permissions_for(me).send_messages:
+                    continue
+
+                state = self._inactivity_states.get(channel.id)
+                if not state:
+                    self._reset_inactivity_for_channel(channel.id)
+                    state = self._inactivity_states.get(channel.id)
+                    if not state:
+                        continue
+
+                if now >= state["next_send_at"]:
+                    try:
+                        await channel.send(self._inactivity_message)
+                        next_index = (state["next_sequence_index"] + 1) % len(self._inactivity_sequence_seconds)
+                        state["next_sequence_index"] = next_index
+                        state["next_send_at"] = now + self._inactivity_sequence_seconds[next_index]
+                    except Exception:
+                        continue
+
+                if self._daily_enabled:
+                    local_now = datetime.now(timezone.utc) + timedelta(minutes=self._daily_utc_offset_minutes)
+                    last_daily_date = state.get("daily_last_sent_date")
+                    is_daily_time = local_now.hour == self._daily_hour and local_now.minute == self._daily_minute
+                    started_at = state.get("started_at", now)
+                    is_silent = (now - started_at) >= self._daily_required_silence
+                    if is_daily_time and is_silent and last_daily_date != str(local_now.date()):
+                        try:
+                            await channel.send(self._daily_message)
+                            state["daily_last_sent_date"] = str(local_now.date())
+                        except Exception:
+                            continue
+
+            await asyncio.sleep(self._inactivity_poll_interval)
 
     def _normalize_question(self, text: str) -> str:
         return re.sub(r"\s+", " ", text or "").strip().lower()

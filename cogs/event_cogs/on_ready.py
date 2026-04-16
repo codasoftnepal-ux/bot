@@ -4,7 +4,7 @@ import discord
 from discord.ext import commands
 
 from bot_utilities.config_loader import config
-from ..common import presences_disabled, current_language, presences
+from ..common import presences_disabled, presences
 
 class OnReady(commands.Cog):
     def __init__(self, bot):
@@ -12,7 +12,10 @@ class OnReady(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        presences_cycle = cycle(presences + [current_language['help_footer']])
+        presence_items = [p for p in presences if isinstance(p, str) and p.strip()]
+        if not presence_items:
+            presence_items = [f"Serving {len(self.bot.guilds)} guilds"]
+        presences_cycle = cycle(presence_items)
         print(f"{self.bot.user} aka {self.bot.user.name} has connected to Discord!")
         invite_link = discord.utils.oauth_url(
             self.bot.user.id,
